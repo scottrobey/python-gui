@@ -1,5 +1,7 @@
+import subprocess
 import tkinter as tk
 from time import sleep
+import os
 from tkinter import *
 from tkinter import BOTH
 from tkinter.filedialog import askopenfilename
@@ -7,7 +9,7 @@ from tkinter.filedialog import askdirectory
 
 main_window = Tk()
 
-# global textvars
+# global textvars, TODO: figure out why textvar didn't update
 status_text = StringVar()
 
 # global frames we will be updating
@@ -20,6 +22,14 @@ file_to_send = 'no file chosen'
 location_to_receive = ''
 wormhole_code = StringVar()
 wormhole_code.set('')
+
+
+def human_readable_size(size, decimal_places=2):
+    for unit in ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB']:
+        if size < 1024.0 or unit == 'PiB':
+            break
+        size /= 1024.0
+    return f"{size:.{decimal_places}f} {unit}"
 
 
 def reset():
@@ -65,16 +75,37 @@ def update_go(text, callback):
     go_button.pack()
 
 
+def check_if_wormhole_exists():
+    completed = subprocess.run(['which', 'wormhole'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    if completed.returncode == 0:
+        return True
+    else:
+        update_status("wormhole command line not present or is not configured in PATH. Install Magic Wormhole from: "
+                      "https://github.com/magic-wormhole/magic-wormhole and try again")
+        return False
+
+
 def go_send_file():
     global go_frame
     go_frame.destroy()
     print(f"Sending file: {file_to_send} to Wormhole...")
-    update_status(f"Sending file: {file_to_send} to Wormhole...")
+    update_status(f"(Please Wait) Sending file: {file_to_send} to Wormhole...")
 
-    # TODO: call wormhole here
-    wormhole_send_code = 'yoyoma'
+    if check_if_wormhole_exists():
+        # TODO: call wormhole here -  see: https://stackoverflow.com/a/17698359
+        #  Example:  wormhole send <file_to_send>   -> wormhole send README.md
+        #  Process will block until the receiver gets the file so we need to read stdout to get the wormhole code to provide
+        #  to the receiver
+        #  TODO: Implement a cancel button since we may want the ability to cancel a file being sent. The send should prob
+        #        be done in a separate window so the UX related to cancel is cleaner
+        completed = subprocess.run(['which', 'make'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        print(f"Process info: return_code:{completed.returncode}, output:{completed.stdout}")
 
-    update_status(f"Sending file: {file_to_send} to Wormhole...COMPLETE\n Wormhole Code: {wormhole_send_code}")
+        wormhole_send_code = 'yoyoma'
+        main_window.update_idletasks()
+        sleep(5)
+
+        update_status(f"Sending file: {file_to_send} to Wormhole...COMPLETE\n Wormhole Code: {wormhole_send_code}")
 
 
 def go_receive_file():
@@ -84,28 +115,43 @@ def go_receive_file():
     go_frame.destroy()
 
     print(f"Receiving file using Wormhole code: {wormhole_code.get()} to location: {location_to_receive}")
+
     update_status(f"Receiving file using Wormhole code: {wormhole_code.get()} \nDestination location: {location_to_receive}")
 
-    # TODO: call wormhole here
+    # TODO: call wormhole here -
+    # Example: wormhole receive --accept-file <wormhole_code>
+    # Call will block 'Waiting for sender...'  so need to implement a cancel feature
+    # Should prob put the send and receive into it's own window so the cancel makes more UX sense
+    # Note: need to switch the working directory to location_to_receive
+    # Afterwards stat the file to ensure it was received
+    # Note if the file already exists the wormhole receive command will fail -
+    # TODO: add a feature to override files received. Implement this by creating a temp dir to receive the file then moving it
+    #       back to the location_to_receive
 
 
 def choose_file():
     global main_window
     global file_to_send
-    file_to_send = askopenfilename()
+    file_to_send = askopenfilename(parent=main_window, initialdir=r'.', title='Choose File to Send')
 
-    print(f"File chosen: {file_to_send}")
+    if file_to_send != '':
+        print(f"File chosen: {file_to_send}")
 
-    update_status(f"File to send: {file_to_send}")
-
-    update_go("Send File Go!", go_send_file)
+        if os.path.isfile(file_to_send):
+            file_size = human_readable_size(os.path.getsize(file_to_send))
+            update_status(f"File to send: {file_to_send}, size: {file_size}")
+            update_go("Send File Go!", go_send_file)
+        else:
+            print(f"Not a file: {file_to_send}")
+    else:
+        print("No file selected")
 
 
 def choose_location():
     global main_window
     global location_to_receive
 
-    location_to_receive = askdirectory()
+    location_to_receive = askdirectory(parent=main_window, initialdir=r'.', title='Choose Location to Store Received File')
 
     update_status(f"Location where file will be stored: {location_to_receive}")
 
@@ -139,8 +185,9 @@ def receive_file():
 
 
 main_window.title("Wormhole UI")
-greeting = Label(text="Welcome to Wormhole UI, the quick and easy way to transfer files across the internet using the Magic "
-                      "Wormhole protocol")
+greeting = Label(text=
+                 "Welcome to Wormhole UI, the quick and easy way to transfer files across the internet using the Magic "
+                 "Wormhole protocol")
 greeting.pack()
 
 send = Button(

@@ -28,11 +28,16 @@ Magic Wormhole is a command line utility, the GUI will wrap the commands for eit
 Later, may consider supporting other utilities for transferring files, like using Dropbox or maybe SCP, etc.
 
 Features:
-* Logging or debug window
-* Config settings - location to binary, etc.
-* Progress for file transfer
+* Add support for sending and receiving - text message and directories
+* Logging or debug window - proper file menu
+* Add details about file being sent / received like size, etc.
+* Config settings - location to wormhole binary, etc.
+* Progress bar for file transfer - use wormhole --dump-timing to get timing data?
 * Enhanced Error Checking
-* Links to open file?
+* Links to open files? like what? link to wormhole itself
+* History
+* Drag and drop files to send
+* Support for multiple files
 * Modern look
 
 
