@@ -6,6 +6,8 @@ from tkinter import *
 from tkinter import BOTH
 from tkinter.filedialog import askopenfilename
 from tkinter.filedialog import askdirectory
+from subprocess import Popen, PIPE
+import re as regex
 
 main_window = Tk()
 
@@ -91,21 +93,30 @@ def go_send_file():
     print(f"Sending file: {file_to_send} to Wormhole...")
     update_status(f"(Please Wait) Sending file: {file_to_send} to Wormhole...")
 
+    pattern = regex.compile('Wormhole code is:.*')
+
     if check_if_wormhole_exists():
-        # TODO: call wormhole here -  see: https://stackoverflow.com/a/17698359
-        #  Example:  wormhole send <file_to_send>   -> wormhole send README.md
-        #  Process will block until the receiver gets the file so we need to read stdout to get the wormhole code to provide
-        #  to the receiver
+        # call wormhole here -  see: https://stackoverflow.com/a/17698359
+        #  Example:  wormhole send <file_to_send>
         #  TODO: Implement a cancel button since we may want the ability to cancel a file being sent. The send should prob
         #        be done in a separate window so the UX related to cancel is cleaner
-        completed = subprocess.run(['which', 'make'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        print(f"Process info: return_code:{completed.returncode}, output:{completed.stdout}")
+        output_buff = ''
+        with Popen(["wormhole", "send", f"{file_to_send}"], stdout=PIPE, stderr=subprocess.STDOUT, bufsize=1,
+                   universal_newlines=True) as p:
+            for line in p.stdout:
+                print(line, end='')
+                output_buff += line
+                if pattern.match(line):
+                    update_status(f"File has been sent to wormhole, waiting for file to be received - {line}")
+                    main_window.update_idletasks()
 
-        wormhole_send_code = 'yoyoma'
+        if p.returncode != 0:
+            print(f"Process Failed with exit code: {p.returncode}")
+            update_status(f"** Send file failed** \n {output_buff}")
+        else:
+            update_status(f"File sent successfully")
+
         main_window.update_idletasks()
-        sleep(5)
-
-        update_status(f"Sending file: {file_to_send} to Wormhole...COMPLETE\n Wormhole Code: {wormhole_send_code}")
 
 
 def go_receive_file():
